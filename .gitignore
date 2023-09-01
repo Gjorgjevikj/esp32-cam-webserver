@@ -5,3 +5,11 @@ myconfig.h
 .gcc-flags.json
 .pio
 .vscode
+Debug
+Release
+__vm
+.vs
+*.sln
+*.vcxproj
+*.vcxproj.filters 
+*.vcxproj.user

@@ -8,6 +8,7 @@
 #include "src/parsebytes.h"
 #include "time.h"
 #include <ESPmDNS.h>
+//#include <fs.h>
 
 
 /* This sketch is a extension/expansion/reork of the 'official' ESP32 Camera example
@@ -281,7 +282,7 @@ void setLamp(int newVal) {
 #endif
 }
 
-void printLocalTime(bool extraData=false) {
+void printLocalTime(bool extraData /*=false*/) {
     struct tm timeinfo;
     if(!getLocalTime(&timeinfo)){
         Serial.println("Failed to obtain time");
@@ -628,6 +629,21 @@ void WifiSetup() {
     }
 }
 
+void errorBlink(unsigned long int pattern, int patlen = 20, unsigned long int duration = 100, int repeat = 1)
+{
+    unsigned long int m;
+    pinMode(LED_PIN, OUTPUT);
+    for (int i = 0; i < repeat; i++)
+    {
+        m = 1<<patlen;
+        while(m)
+        {
+            digitalWrite(LED_PIN, (pattern&m ? LED_ON : LED_OFF));
+            delay(duration);
+        }
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
@@ -646,6 +662,7 @@ void setup() {
         Serial.println("\r\nFatal Error; Halting");
         while (true) {
             Serial.println("No PSRAM found; camera cannot be initialised: Please check the board config for your module.");
+            errorBlink(0b101010101,10);
             delay(5000);
         }
     }
@@ -654,6 +671,7 @@ void setup() {
         Serial.println("\r\nFatal Error; Halting");
         while (true) {
             Serial.println("No wifi details have been configured; we cannot connect to existing WiFi or start our own AccessPoint, there is no point in proceeding.");
+            errorBlink(0b10100011100011100000);
             delay(5000);
         }
     }
@@ -684,6 +702,7 @@ void setup() {
     * Camera setup complete; initialise the rest of the hardware.
     */
 
+    WiFi.setHostname(HOSTNAME);
     // Start Wifi and loop until we are connected or have started an AccessPoint
     while ((WiFi.status() != WL_CONNECTED) && !accesspoint)  {
         WifiSetup();
@@ -717,7 +736,7 @@ void setup() {
                 // Stop the camera since OTA will crash the module if it is running.
                 // the unit will need rebooting to restart it, either by OTA on success, or manually by the user
                 Serial.println("Stopping Camera");
-                esp_err_t err = esp_camera_deinit();
+                /*esp_err_t err = */ esp_camera_deinit();
                 critERR = "<h1>OTA Has been started</h1><hr><p>Camera has Halted!</p>";
                 critERR += "<p>Wait for OTA to finish and reboot, or <a href=\"control?var=reboot&val=0\" title=\"Reboot Now (may interrupt OTA)\">reboot manually</a> to recover</p>";
             })
@@ -725,7 +744,21 @@ void setup() {
                 Serial.println("\r\nEnd");
             })
             .onProgress([](unsigned int progress, unsigned int total) {
-                Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+                static int prog = 0;
+                static char disp_raw[22] = "                    ";
+                int newprog = progress * 100 / total;
+                if (newprog < prog) // reset
+                {
+                    prog = 0;
+                    memset(disp_raw, ' ', 20);
+                    disp_raw[20] = 0;
+                }
+                else if (newprog - prog >= 5)
+                {
+                    memset(disp_raw, '=', newprog / 5);
+                    prog = newprog;
+                    Serial.printf("Progress: %3u%% [%s]\n", newprog, disp_raw);
+                }
             })
             .onError([](ota_error_t error) {
                 Serial.printf("Error[%u]: ", error);
@@ -826,10 +859,32 @@ void loop() {
             }
             // loop here for WIFI_WATCHDOG, turning debugData true/false depending on serial input..
             unsigned long start = millis();
+            int n = 0;
             while (millis() - start < WIFI_WATCHDOG ) {
+                if (n % 10 == 0)
+                {
+                    //if (lampVal != -1 && autoLamp)
+                    //    setLamp(4);
+                    digitalWrite(LED_PIN, LED_ON);
+                }
+                else
+                {
+                    //if (lampVal != -1 && autoLamp)
+                    //    setLamp(0);
+                    digitalWrite(LED_PIN, LED_OFF);
+                }
+                if (lampVal != -1 && autoLamp)
+                {
+                    if (streamCount)
+                        setLamp(4);
+                    else
+                        setLamp(0);
+                }
+
                 delay(100);
                 if (otaEnabled) ArduinoOTA.handle();
                 handleSerial();
+                n++;
             }
         } else {
             // disconnected; attempt to reconnect

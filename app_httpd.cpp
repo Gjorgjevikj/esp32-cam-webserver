@@ -148,11 +148,14 @@ void serialDump() {
     int McuTf = temprature_sens_read(); // fahrenheit
     Serial.printf("System up: %" PRId64 ":%02i:%02i:%02i (d:h:m:s)\r\n", upDays, upHours, upMin, upSec);
     Serial.printf("Active streams: %i, Previous streams: %lu, Images captured: %lu\r\n", streamCount, streamsServed, imagesServed);
-    Serial.printf("CPU Freq: %i MHz, Xclk Freq: %i MHz\r\n", ESP.getCpuFreqMHz(), xclk);
+    Serial.printf("CPU: %s Rev %d (%d core%s) Freq: %u MHz, Xclk Freq: %lu MHz\r\n", 
+        ESP.getChipModel(), ESP.getChipRevision(), ESP.getChipCores(), (ESP.getChipCores() >1 ? "s":""), ESP.getCpuFreqMHz(), xclk);
+    Serial.printf("FLASH size: %.2fMB, RAM size: %.2fKB\n", ESP.getFlashChipSize() / (1024.0 * 1024), ESP.getHeapSize() / 1024.0);
     Serial.printf("MCU temperature : %i C, %i F  (approximate)\r\n", McuTc, McuTf);
     Serial.printf("Heap: %i, free: %i, min free: %i, max block: %i\r\n", ESP.getHeapSize(), ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
     if(psramFound()) {
-        Serial.printf("Psram: %i, free: %i, min free: %i, max block: %i\r\n", ESP.getPsramSize(), ESP.getFreePsram(), ESP.getMinFreePsram(), ESP.getMaxAllocPsram());
+        Serial.printf("SPIram: %iMB, Psram: %i, free: %i, min free: %i, max block: %i\r\n", 
+            esp_spiram_get_size() / (1024 * 1024), ESP.getPsramSize(), ESP.getFreePsram(), ESP.getMinFreePsram(), ESP.getMaxAllocPsram());
     } else {
         Serial.printf("Psram: Not found; please check your board configuration.\r\n");
         Serial.printf("- High resolution/quality settings will show incomplete frames to low memory.\r\n");
@@ -449,7 +452,7 @@ static esp_err_t status_handler(httpd_req_t *req){
         p+=sprintf(p, "\"min_frame_time\":%d,", minFrameTime);
         p+=sprintf(p, "\"framesize\":%u,", s->status.framesize);
         p+=sprintf(p, "\"quality\":%u,", s->status.quality);
-        p+=sprintf(p, "\"xclk\":%u,", xclk);
+        p+=sprintf(p, "\"xclk\":%lu,", xclk);
         p+=sprintf(p, "\"brightness\":%d,", s->status.brightness);
         p+=sprintf(p, "\"contrast\":%d,", s->status.contrast);
         p+=sprintf(p, "\"saturation\":%d,", s->status.saturation);
@@ -598,12 +601,15 @@ static esp_err_t dump_handler(httpd_req_t *req){
 
     d+= sprintf(d,"Up: %" PRId64 ":%02i:%02i:%02i (d:h:m:s)<br>\n", upDays, upHours, upMin, upSec);
     d+= sprintf(d,"Active streams: %i, Previous streams: %lu, Images captured: %lu<br>\n", streamCount, streamsServed, imagesServed);
-    d+= sprintf(d,"CPU Freq: %i MHz, Xclk Freq: %i MHz<br>\n", ESP.getCpuFreqMHz(), xclk);
+    d+= sprintf(d,"CPU: %s rev %d (%d core%s) Freq: %u MHz, Xclk Freq: %lu MHz<br>\n", 
+        ESP.getChipModel(), ESP.getChipRevision(), ESP.getChipCores(), (ESP.getChipCores() > 1 ? "s" : ""), ESP.getCpuFreqMHz(), xclk);
     d+= sprintf(d,"<span title=\"NOTE: Internal temperature sensor readings can be innacurate on the ESP32-c1 chipset, and may vary significantly between devices!\">");
     d+= sprintf(d,"MCU temperature : %i &deg;C, %i &deg;F</span>\n<br>", McuTc, McuTf);
+    d += sprintf(d, "FLASH size: %.2fMB, RAM size: %.2fKB\n<br>", ESP.getFlashChipSize() / (1024.0 * 1024), ESP.getHeapSize() / 1024.0);
     d+= sprintf(d,"Heap: %i, free: %i, min free: %i, max block: %i<br>\n", ESP.getHeapSize(), ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
     if (psramFound()) {
-        d+= sprintf(d,"Psram: %i, free: %i, min free: %i, max block: %i<br>\n", ESP.getPsramSize(), ESP.getFreePsram(), ESP.getMinFreePsram(), ESP.getMaxAllocPsram());
+        d+= sprintf(d,"spiRam: %iMB, Psram: %i, free: %i, min free: %i, max block: %i<br>\n", 
+            esp_spiram_get_size() / (1024 * 1024), ESP.getPsramSize(), ESP.getFreePsram(), ESP.getMinFreePsram(), ESP.getMaxAllocPsram());
     } else {
         d+= sprintf(d,"Psram: <span style=\"color:red;\">Not found</span>, please check your board configuration.<br>\n");
         d+= sprintf(d,"- High resolution/quality images & streams will show incomplete frames due to low memory.<br>\n");
